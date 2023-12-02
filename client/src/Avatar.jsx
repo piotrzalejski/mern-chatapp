@@ -1,4 +1,4 @@
-export default function Avatar({userId,username}){
+export default function Avatar({userId,username,online}){
     const colors = ['bg-teal-200','bg-red-200', 'bg-green-200', 
                     'bg-purple-200', 'bg-cyan-200', 'bg-yellow-200',
                     'bg-orange-200', 'bg-pink-200', 'bg-lime-200',
@@ -8,8 +8,9 @@ export default function Avatar({userId,username}){
     console.log(colorIndex)
     const color = colors[colorIndex]
     return(
-        <div className={"w-8 h-8 rounded-full flex items-center " + color}>
+        <div className={"w-8 h-8 relative rounded-full flex items-center " + color}>
             <div className="text-center w-full opacity-70">{username[0]}</div>
+            <div className={"absolute w-3 h-3 bottom-0 right-0 rounded-full border border-white " + (online ? "bg-lime-500" : "bg-gray-500")}></div>
         </div>
     )
 }
