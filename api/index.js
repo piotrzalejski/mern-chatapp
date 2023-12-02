@@ -4,6 +4,7 @@ const express = require('express')
 const jwt = require('jsonwebtoken')
 const mongoose = require('mongoose')
 const User = require('./models/User')
+const Message = require('./models/Message')
 const cookieParser = require('cookie-parser')
 const bcrypt = require('bcryptjs')
 const ws = require('ws')
@@ -82,6 +83,7 @@ const server = app.listen(4005)
 const wss = new ws.WebSocketServer({server})
 wss.on('connection', (connection, req) => {
     //console.log(req.headers)
+    // read username and id from the cookie for this connection
     const cookies = req.headers.cookie
     if (cookies) {
         const tCookieString = cookies.split(';').find(str => str.startsWith('token='))
@@ -96,16 +98,37 @@ wss.on('connection', (connection, req) => {
                     const {userId, username} = userData;
                     connection.userId = userId
                     connection.username = username
-                } )
+                });
             }
         }
     }
-
-    //console.log([...wss.clients].map(c => c.username))
+    
+    // notify everone about online users (when somone connects)
     [...wss.clients].forEach(client => {
         client.send(JSON.stringify({
-           online: [...wss.clients].map(c => ({userId:c.userId, username:c.username}))
+            online: [...wss.clients].map(c => ({userId:c.userId, username:c.username}))
         }
         ))
+    })
+
+    connection.on('message', async (receivedMessage) => {
+        const message = JSON.parse(receivedMessage.toString())
+        console.log(message)
+        const {recipient, text} = message
+        if (recipient && text ){
+            msgDoc = await Message.create({
+                sender: connection.userId,
+                recipient,
+                text
+            });
+
+            [...wss.clients]
+                .filter(c => c.userId === recipient)
+                .forEach( c => c.send(JSON.stringify({
+                        text, 
+                        sender: connection.userId,
+                        recipient,
+                        id: msgDoc._id})))
+        }
     })
 })
