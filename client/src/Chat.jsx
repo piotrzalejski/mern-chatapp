@@ -3,6 +3,7 @@ import Avatar from "./Avatar"
 import Logo from "./Logo"
 import { UserContext } from "./UserContext"
 import { uniqBy } from 'lodash'
+import axios from "axios"
 
 export default function Chat() {
     const [ws, setWs] = useState(null)
@@ -13,10 +14,19 @@ export default function Chat() {
     const {username, id} = useContext(UserContext)
     const messageBoxRef = useRef()
     useEffect(() => {
+        connectToWs()
+    }, [])
+    function connectToWs(){
         const ws = new WebSocket('ws://localhost:4005')
         setWs(ws)
         ws.addEventListener('message', handleMessage )
-    }, [])
+        ws.addEventListener('close', () => {
+            setTimeout(() =>{
+                console.log('Disconnected. Trying to reconnect.')
+                connectToWs()
+            }, 1000)
+        })
+    }
     function showOnlinePeeps(peopleArr){
         const people = {}
         peopleArr.forEach(({userId, username}) => {
@@ -36,7 +46,7 @@ export default function Chat() {
     }
     function sendMessage(ev){
         ev.preventDefault()
-        console.log('sending')
+        //console.log('sending')
         ws.send(JSON.stringify({
             recipient: selectedUserId,
             text: newMessageText
@@ -46,21 +56,30 @@ export default function Chat() {
             text: newMessageText, 
             sender: id,
             recipient: selectedUserId,
-            id: Date.now()
+            _id: Date.now()
         }]))
     }
 
     useEffect(() => {
         const div = messageBoxRef.current
         if (div) {
-            div.scrollIntoView({behavior: 'smooth', block: "end"})
+            div.scrollIntoView({behavior: 'smooth', block: 'end', inline: 'nearest'})
+            //div.scrollTop = div.scrollHeight
         }
     }, [messages])
+
+    useEffect(() => {
+        if (selectedUserId){
+            axios.get('/messages/'+ selectedUserId).then(res => {
+                setMessages(res.data)
+            })
+        }
+    }, [selectedUserId])
 
     const  onlinePeopleMinusUser = {...onlinePeople}
     delete onlinePeopleMinusUser[id]
 
-    const messagesWithoutDupes = uniqBy(messages, 'id')
+    const messagesWithoutDupes = uniqBy(messages, '_id')
     /**
      * left chats/people
      * middle conversation
@@ -97,15 +116,14 @@ export default function Chat() {
                         <div className="relative h-full">
                             <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
                                 {messagesWithoutDupes.map(message => (
-                                    <div className={(message.sender === id ? "text-right" : "text-left")}>
-                                        <div className={"inline-block text-left p-2 my-2 text-sm rounded-md " + (message.sender === id ? 'bg-blue-500 text-white' : 'bg-white text-gray-500')}>
-                                        sender:{message.sender}<br />
-
-                                        {message.text}</div>
+                                    <div key={message._id} className={(message.sender === id ? "text-right" : "text-left")}>
+                                        <div className={"inline-block text-left p-2 my-2 text-sm rounded-md max-w-md " + (message.sender === id ? 'bg-blue-500 text-white' : 'bg-white text-gray-500')}>
+                                            {message.text}
+                                        </div>
                                     </div>
                                 ))}
-                            </div>
                             <div ref={messageBoxRef}></div>
+                            </div>
                         </div>
                     )}
                 </div>
