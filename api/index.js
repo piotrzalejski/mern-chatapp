@@ -8,6 +8,7 @@ const Message = require('./models/Message')
 const cookieParser = require('cookie-parser')
 const bcrypt = require('bcryptjs')
 const ws = require('ws')
+const fs = require('fs')
 
 dotenv.config()
 mongoose.connect(process.env.MONGO_URL)
@@ -16,6 +17,7 @@ jwtSecret = process.env.JWT_SECRET
 const bcryptSalt = bcrypt.genSaltSync(10)
 
 const app = express();
+app.use('/uploads', express.static(__dirname + '/uploads'))
 app.use(express.json());
 app.use(cookieParser())
 app.use(cors({
@@ -172,13 +174,30 @@ wss.on('connection', (connection, req) => {
 
     connection.on('message', async (receivedMessage) => {
         const message = JSON.parse(receivedMessage.toString())
-        console.log(message)
-        const {recipient, text} = message
-        if (recipient && text ){
+        const {recipient, text, file } = message
+        let filename = null
+        if (file) {
+            console.log({file})
+            const parts = file.name.split('.')
+            const ext = parts[parts.length - 1]
+            filename = Date.now() + '.' + ext
+            const bufferData = new Buffer(file.data.split(',')[1], 'base64')
+            const path = __dirname + '/uploads/' + filename
+            fs.writeFile(path, bufferData, (err) => {
+                if (err) {
+                    console.error('Error saving file:', err);
+                } else {
+                    console.log('File saved successfully');
+                }}
+            )
+        }
+
+        if (recipient && (text || file)){
             msgDoc = await Message.create({
                 sender: connection.userId,
                 recipient,
-                text
+                text,
+                file: file ? filename : null
             });
 
             [...wss.clients]
@@ -187,6 +206,7 @@ wss.on('connection', (connection, req) => {
                         text, 
                         sender: connection.userId,
                         recipient,
+                        file: file ? filename : null,
                         _id: msgDoc._id})))
         }
     })

@@ -43,15 +43,18 @@ export default function Chat() {
         if ('online' in messageData){
             showOnlinePeeps(messageData.online)
         } else {
-            setMessages(prev => ([...prev, {...messageData}]))
+            if (messageData.sender === selectedUserId) {
+                setMessages(prev => ([...prev, {...messageData}]))
+            }
         }
     }
-    function sendMessage(ev){
-        ev.preventDefault()
+    function sendMessage(ev, file = null){
+        if (ev) ev.preventDefault()
         //console.log('sending')
         ws.send(JSON.stringify({
             recipient: selectedUserId,
-            text: newMessageText
+            text: newMessageText,
+            file
         }))
         setNewMessageText('')
         setMessages(prev => ([...prev, {
@@ -60,6 +63,11 @@ export default function Chat() {
             recipient: selectedUserId,
             _id: Date.now()
         }]))
+        if (file) {
+            axios.get('/messages/'+ selectedUserId).then(res => {
+                setMessages(res.data)
+            })
+        }
     }
     function logout(){
         axios.post('/logout').then(() => {
@@ -67,6 +75,16 @@ export default function Chat() {
             setId(null)
             setUsername(null)
         })
+    }
+    function sendFile(ev){
+        const reader = new FileReader()
+        reader.readAsDataURL(ev.target.files[0])
+        reader.onload = () =>{
+            sendMessage(null, {
+                name: ev.target.files[0].name,
+                data: reader.result
+            })
+        }
     }
 
     useEffect(() => {
@@ -133,7 +151,7 @@ export default function Chat() {
                     ))}
                 </div>
                 <div className="p-2 text-center flex items-center justify-center">
-                    <span className="mr-2 text-sm text-gray-500 flex items-center">
+                    <span className="mr-2 text-sm text-gray-600 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-5.5-2.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM10 12a5.99 5.99 0 00-4.793 2.39A6.483 6.483 0 0010 16.5a6.483 6.483 0 004.793-2.11A5.99 5.99 0 0010 12z" clipRule="evenodd" />
                         </svg>
@@ -141,7 +159,7 @@ export default function Chat() {
                         </span>
                     <button 
                         onClick={logout}
-                        className="text-sm text-gray-500 bg-gray-100 py-1 px-2 border rounded-md">Logout</button>
+                        className="text-sm text-gray-500 bg-gray-100 py-1 px-2 border rounded-md hover:bg-gray-200">Logout</button>
                 </div>
             </div>
             <div className=" flex flex-col bg-gray-50 w-2/3 p-2">
@@ -160,6 +178,9 @@ export default function Chat() {
                                     <div key={message._id} className={(message.sender === id ? "text-right" : "text-left")}>
                                         <div className={"inline-block text-left p-2 my-2 text-sm rounded-md max-w-md " + (message.sender === id ? 'bg-blue-500 text-white' : 'bg-white text-gray-500')}>
                                             {message.text}
+                                            {message.file && (
+                                                <div><a className="border-b" href={axios.defaults.baseURL + '/uploads/' + message.file}>{message.file}</a></div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -175,7 +196,13 @@ export default function Chat() {
                         onChange={ev => setNewMessageText(ev.target.value)}
                         placeholder="Type your message here: " 
                         className="bg-white border p-2 flex-grow rounded-md" />
-                    <button className="bg-blue-500 p-2 text-white rounded-md">
+                    <label type="button" className="bg-gray-200 p-2 rounded-md border border-gray-300">
+                        <input type="file" className="hidden cursor-pointer" onChange={sendFile}/>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                            <path fillRule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clipRule="evenodd" />
+                        </svg>
+                    </label>
+                    <button type="submit" className="bg-blue-500 p-2 text-white rounded-md">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                             <path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" />
                         </svg>
